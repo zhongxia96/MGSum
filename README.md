@@ -1,5 +1,5 @@
 # MGSum
-**Code for ACL'20 paper [Multi-Granularity Interaction Network for Extractive and Abstractive Multi-Document Summarization](https://www.aclweb.org/anthology/2020.acl-main.556/) by Hanqi Jin, Tianming Wang, Xiaojun Wan. This paper is accepted by ACL'20. **
+**Code for ACL'20 paper [Multi-Granularity Interaction Network for Extractive and Abstractive Multi-Document Summarization](https://www.aclweb.org/anthology/2020.acl-main.556/) by Hanqi Jin, Tianming Wang, Xiaojun Wan. This paper is accepted by ACL'20.**
 
 Some codes are borrowed from [fairseq](https://github.com/pytorch/fairseq).
 
