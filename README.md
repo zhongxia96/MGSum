@@ -4,8 +4,8 @@
 Some codes are borrowed from [fairseq](https://github.com/pytorch/fairseq).
 
 **Requirements and Installation：**
-PyTorch version >= 1.4.0
-Python version >= 3.6
+*PyTorch version >= 1.4.0
+*Python version >= 3.6
 
 **Preprocess：**
 ```
