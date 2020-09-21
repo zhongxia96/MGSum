@@ -7,6 +7,9 @@ Some codes are borrowed from [fairseq](https://github.com/pytorch/fairseq).
 * PyTorch version >= 1.4.0
 * Python version >= 3.6
 
+**Download Data：**
+
+
 **Preprocess：**
 ```
 python process_hierarchical_sent_doc.py --source-lang src --target-lang tgt \
