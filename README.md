@@ -3,6 +3,10 @@
 
 Some codes are borrowed from [fairseq](https://github.com/pytorch/fairseq).
 
+**Requirements and Installation：**
+PyTorch version >= 1.4.0
+Python version >= 3.6
+
 **Preprocess：**
 ```
 python process_hierarchical_sent_doc.py --source-lang src --target-lang tgt \
