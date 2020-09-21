@@ -37,28 +37,27 @@ from fairseq.modules import (
 )
 
 
-@register_model('hierarchical_transformer_doc_sent_word')
+@register_model('hierarchical_transformer_sent_word')
 class HierarchicalTransformerModel(FairseqModel):
     """
-    hierarchical_transformer_doc_sent_word model from `"Attention Is All You Need" (Vaswani, et al, 2017)
+    hierarchical_transformer_sent_word model from `"Attention Is All You Need" (Vaswani, et al, 2017)
     <https://arxiv.org/abs/1706.03762>`_.
 
     Args:
-        encoder (hierarchical_transformer_doc_sent_wordEncoder): the encoder
-        decoder (hierarchical_transformer_doc_sent_wordDecoder): the decoder
+        encoder (hierarchical_transformer_sent_wordEncoder): the encoder
+        decoder (hierarchical_transformer_sent_wordDecoder): the decoder
 
-    The hierarchical_transformer_doc_sent_word model provides the following named architectures and
+    The hierarchical_transformer_sent_word model provides the following named architectures and
     command-line arguments:
 
     .. argparse::
-        :ref: fairseq.models.hierarchical_transformer_doc_sent_word_parser
+        :ref: fairseq.models.hierarchical_transformer_sent_word_parser
         :prog:
     """
 
-    def __init__(self, encoder, decoder, sentence_decoder, doc_decoder):
+    def __init__(self, encoder, decoder, sentence_decoder):
         super().__init__(encoder, decoder)
         self.sentence_decoder = sentence_decoder
-        self.doc_decoder = doc_decoder
 
     @staticmethod
     def add_args(parser):
@@ -151,8 +150,7 @@ class HierarchicalTransformerModel(FairseqModel):
         encoder_out = self.encoder(src_tokens, src_lengths, block_mask, doc_lengths, doc_block_mask)
         decoder_out = self.decoder(prev_output_tokens, encoder_out)
         sentence_decoder_out = self.sentence_decoder(encoder_out)
-        doc_decoder_out = self.doc_decoder(encoder_out)
-        return decoder_out, sentence_decoder_out, doc_decoder_out
+        return decoder_out, sentence_decoder_out
 
     @classmethod
     def build_model(cls, args, task):
@@ -203,14 +201,13 @@ class HierarchicalTransformerModel(FairseqModel):
         encoder = HierarchicalTransformerEncoder(args, src_dict, encoder_embed_tokens)
         decoder = HierarchicalTransformer_with_copyDecoder(args, tgt_dict, decoder_embed_tokens)
         sentence_decoder = HierarchicalTransformer_with_sentenceDecoder(args)
-        doc_decoder = HierarchicalTransformer_with_docDecoder(args)
-        return HierarchicalTransformerModel(encoder, decoder, sentence_decoder, doc_decoder)
+        return HierarchicalTransformerModel(encoder, decoder, sentence_decoder)
 
 
 class HierarchicalTransformerEncoder(FairseqEncoder):
     """
-    hierarchical_transformer_doc_sent_word encoder consisting of *args.encoder_layers* layers. Each layer
-    is a :class:`hierarchical_transformer_doc_sent_wordEncoderLayer`.
+    hierarchical_transformer_sent_word encoder consisting of *args.encoder_layers* layers. Each layer
+    is a :class:`hierarchical_transformer_sent_wordEncoderLayer`.
 
     Args:
         args (argparse.Namespace): parsed command-line arguments
@@ -232,10 +229,6 @@ class HierarchicalTransformerEncoder(FairseqEncoder):
             args.max_source_positions, embed_dim / 2, self.padding_idx,
             learned=args.encoder_learned_pos,
         ) if not args.no_token_positional_embeddings else None
-        self.embed_positions2 = PositionalEmbedding(
-            args.max_source_positions, embed_dim / 4, self.padding_idx,
-            learned=args.encoder_learned_pos,
-        ) if not args.no_token_positional_embeddings else None
 
         self.layers = nn.ModuleList([])
         self.layers.extend([
@@ -248,7 +241,6 @@ class HierarchicalTransformerEncoder(FairseqEncoder):
         if self.normalize:
             self.layer_norm = LayerNorm(embed_dim)
             self.sentence_norm = LayerNorm(embed_dim)
-            self.doc_norm = LayerNorm(embed_dim)
 
     def forward(self, src_tokens, src_lengths, block_mask, doc_lengths, doc_block_mask):
         """
@@ -299,7 +291,7 @@ class HierarchicalTransformerEncoder(FairseqEncoder):
 
         doc_sentence_lengths = torch.sum(doc_block_mask, 2)  # (batch, n_docs)
 
-        block_pos_emb = self.embed_positions2(torch.sum(src_tokens, 2))  # (batch, n_blocks, embed_dim)
+        block_pos_emb = self.embed_positions(torch.sum(src_tokens, 2))  # (batch, n_blocks, embed_dim)
         block_pos_emb = collate_embedding([torch.cat([block_pos_emb[i, :doc_sentence_lengths[i, j]]
                                                       for j in range(n_docs) if doc_sentence_lengths[i, j] != 0], 0) for
                                            i in
@@ -307,27 +299,27 @@ class HierarchicalTransformerEncoder(FairseqEncoder):
 
         block_pos_emb = block_pos_emb.unsqueeze(2).repeat(1, 1, n_tokens, 1)
 
-        def collate_embedding(values, pad_idx, size):
-            """Convert a list of 2d tensors into a padded 3d tensor."""
-            # size = max(v.size(0) for v in values)
-            res = values[0][0, 0].new(len(values), size, values[0].size(1)).fill_(pad_idx)
+        # def collate_embedding(values, pad_idx, size):
+        #     """Convert a list of 2d tensors into a padded 3d tensor."""
+        #     # size = max(v.size(0) for v in values)
+        #     res = values[0][0, 0].new(len(values), size, values[0].size(1)).fill_(pad_idx)
+        #
+        #     def copy_tensor(src, dst):
+        #         assert dst.numel() == src.numel()
+        #         dst.copy_(src)
+        #
+        #     for i, v in enumerate(values):
+        #         copy_tensor(v[:min(v.size(0), size)], res[i][:v.size(0)])
+        #     return res
+        #
+        # doc_pos_emb = self.embed_positions2(doc_sentence_lengths)  # (batch, n_docs, embed_dim)
+        # doc_pos_emb = collate_embedding([torch.cat([doc_pos_emb[i, j].unsqueeze(0).repeat(doc_sentence_lengths[i, j], 1)
+        #                                             for j in range(doc_pos_emb.size(1)) if
+        #                                             doc_sentence_lengths[i, j] != 0], 0) for i in
+        #                                  range(doc_pos_emb.size(0))], 0, n_blocks)  # (batch, n_blocks, embed_dim)
+        # doc_pos_emb = doc_pos_emb.unsqueeze(2).repeat(1, 1, n_tokens, 1)
 
-            def copy_tensor(src, dst):
-                assert dst.numel() == src.numel()
-                dst.copy_(src)
-
-            for i, v in enumerate(values):
-                copy_tensor(v[:min(v.size(0), size)], res[i][:v.size(0)])
-            return res
-
-        doc_pos_emb = self.embed_positions2(doc_sentence_lengths)  # (batch, n_docs, embed_dim)
-        doc_pos_emb = collate_embedding([torch.cat([doc_pos_emb[i, j].unsqueeze(0).repeat(doc_sentence_lengths[i, j], 1)
-                                                    for j in range(doc_pos_emb.size(1)) if
-                                                    doc_sentence_lengths[i, j] != 0], 0) for i in
-                                         range(doc_pos_emb.size(0))], 0, n_blocks)  # (batch, n_blocks, embed_dim)
-        doc_pos_emb = doc_pos_emb.unsqueeze(2).repeat(1, 1, n_tokens, 1)
-
-        combined_pos_emb = torch.cat([local_pos_emb, block_pos_emb, doc_pos_emb], -1)
+        combined_pos_emb = torch.cat([local_pos_emb, block_pos_emb], -1)
         x += combined_pos_emb
 
         x = F.dropout(x, p=self.dropout, training=self.training)
@@ -342,17 +334,16 @@ class HierarchicalTransformerEncoder(FairseqEncoder):
         x = x.transpose(0, 1)
 
         block_vec = torch.zeros(n_blocks, batch_size, self.embed_tokens.embedding_dim).cuda()
-        doc_vec = torch.zeros(n_docs, batch_size, self.embed_tokens.embedding_dim).cuda()
+
 
         # encoder local layers
         for layer in self.layers:
-            x, block_vec, doc_vec = layer(x, block_vec, doc_vec, local_padding_mask, block_padding_mask,
+            x, block_vec = layer(x, block_vec, local_padding_mask, block_padding_mask,
                                           doc_padding_mask, block_mask, doc_block_mask, batch_size, n_blocks)
 
         if self.normalize:
             x = self.layer_norm(x)
             block_vec = self.sentence_norm(block_vec)
-            doc_vec = self.doc_norm(doc_vec)
 
         # T x B x C -> B x T x C
         x = x.transpose(0, 1)
@@ -396,8 +387,6 @@ class HierarchicalTransformerEncoder(FairseqEncoder):
             'encoder_padding_mask': encoder_padding_mask,  # B x T
             'sentence_out': block_vec,  # T x B x C
             'sentence_padding_mask': block_padding_mask,  # B x T
-            'doc_out': doc_vec,  # T x B x C
-            'doc_padding_mask': doc_padding_mask,  # B x T
         }
 
     def reorder_encoder_out(self, encoder_out, new_order):
@@ -423,12 +412,6 @@ class HierarchicalTransformerEncoder(FairseqEncoder):
         if encoder_out['sentence_padding_mask'] is not None:
             encoder_out['sentence_padding_mask'] = \
                 encoder_out['sentence_padding_mask'].index_select(0, new_order)
-        if encoder_out['doc_out'] is not None:
-            encoder_out['doc_out'] = \
-                encoder_out['doc_out'].index_select(1, new_order)
-        if encoder_out['doc_padding_mask'] is not None:
-            encoder_out['doc_padding_mask'] = \
-                encoder_out['doc_padding_mask'].index_select(0, new_order)
         return encoder_out
 
     def reorder_encoder_input(self, encoder_input, new_order):
@@ -504,7 +487,7 @@ class TransformerLayer(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.embed_dim = args.encoder_embed_dim
-        self.self_block_attn = TopkMultiheadAttentionWithDocmask(
+        self.self_block_attn = TopkMultiheadAttention(
             self.embed_dim, args.encoder_attention_heads,
             dropout=args.attention_dropout,
         )
@@ -516,27 +499,13 @@ class TransformerLayer(nn.Module):
             self.embed_dim, args.encoder_attention_heads,
             dropout=args.attention_dropout,
         )
-        self.self_doc_attn = TopkMultiheadAttention(
-            self.embed_dim, args.encoder_attention_heads,
-            dropout=args.attention_dropout,
-        )
-        self.doc_block_attn = MultiheadGraphAttention(
-            self.embed_dim, args.encoder_attention_heads,
-            dropout=args.attention_dropout,
-        )
-        self.block_doc_attn = MultiheadGraphAttention(
-            self.embed_dim, args.encoder_attention_heads,
-            dropout=args.attention_dropout,
-        )
 
         self.word_fusion = nn.Sequential(nn.Linear(2 * self.embed_dim, 1), nn.Sigmoid())
         self.sentence_fusion = nn.Sequential(nn.Linear(2 * self.embed_dim, 1), nn.Sigmoid())
-        self.sentence_fusion2 = nn.Sequential(nn.Linear(2 * self.embed_dim, 1), nn.Sigmoid())
-        self.doc_fusion = nn.Sequential(nn.Linear(2 * self.embed_dim, 1), nn.Sigmoid())
 
         self.self_attn_word_layer_norm = LayerNorm(self.embed_dim)
         self.self_attn_block_layer_norm = LayerNorm(self.embed_dim)
-        self.self_attn_doc_layer_norm = LayerNorm(self.embed_dim)
+
         self.dropout = args.dropout
         self.activation_fn = utils.get_activation_fn(
             activation=getattr(args, 'activation_fn', 'relu')
@@ -554,9 +523,6 @@ class TransformerLayer(nn.Module):
         self.block_fc2 = Linear(args.encoder_ffn_embed_dim, self.embed_dim)
         self.final_block_layer_norm = LayerNorm(self.embed_dim)
 
-        self.doc_fc1 = Linear(self.embed_dim, args.encoder_ffn_embed_dim)
-        self.doc_fc2 = Linear(args.encoder_ffn_embed_dim, self.embed_dim)
-        self.final_doc_layer_norm = LayerNorm(self.embed_dim)
 
     def upgrade_state_dict_named(self, state_dict, name):
         """
@@ -567,10 +533,8 @@ class TransformerLayer(nn.Module):
         layer_norm_map = {
             '0': 'self_attn_word_layer_norm',
             '1': 'self_attn_block_layer_norm',
-            '2': 'self_attn_doc_layer_norm',
             '3': 'final_word_layer_norm',
             '4': 'final_block_layer_norm',
-            '5': 'final_doc_layer_norm'
         }
         for old, new in layer_norm_map.items():
             for m in ('weight', 'bias'):
@@ -581,7 +545,7 @@ class TransformerLayer(nn.Module):
                     ] = state_dict[k]
                     del state_dict[k]
 
-    def forward(self, x, block_vec, doc_vec, local_padding_mask, block_padding_mask, doc_padding_mask, block_mask,
+    def forward(self, x, block_vec, local_padding_mask, block_padding_mask, doc_padding_mask, block_mask,
                 doc_block_mask, batch_size, n_blocks):
         """
         Args:
@@ -604,11 +568,9 @@ class TransformerLayer(nn.Module):
 
         residual_x = x  # (n_tokens, batch * n_blocks, embed_dim)
         residual_block = block_vec  # (n_blocks, batch, embed_dim)
-        residual_doc = doc_vec  # (n_docs, batch, embed_dim)
 
         x = self.maybe_layer_norm(self.self_attn_word_layer_norm, x, before=True)
         block_vec = self.maybe_layer_norm(self.self_attn_block_layer_norm, block_vec, before=True)
-        doc_vec = self.maybe_layer_norm(self.self_attn_doc_layer_norm, doc_vec, before=True)
 
         # word level
         x, _ = self.self_word_attn(query=x, key=x, value=x, key_padding_mask=local_padding_mask)
@@ -641,34 +603,14 @@ class TransformerLayer(nn.Module):
 
         # block level
         block_vec, _ = self.self_block_attn(query=block_vec, key=block_vec, value=block_vec,
-                                            key_padding_mask=block_padding_mask, doc_mask=block_mask)
+                                            key_padding_mask=block_padding_mask)
         block_vec = F.dropout(block_vec, p=self.dropout, training=self.training)  # (n_blocks, batch, embed_dim)
-
-        # block2doc level
-        inter_doc_vec, _ = self.doc_block_attn(query=doc_vec, key=block_vec, value=block_vec, graph_mask=doc_block_mask)
-        inter_doc_vec = F.dropout(doc_vec, p=self.dropout, training=self.training)
-        doc_fusion = self.word_fusion(torch.cat([doc_vec, inter_doc_vec], 2))
-        doc_vec = doc_fusion * doc_vec + (1 - doc_fusion) * inter_doc_vec
-
-        # doc level
-        doc_vec, _ = self.self_doc_attn(query=doc_vec, key=doc_vec, value=doc_vec, key_padding_mask=doc_padding_mask)
-        doc_vec = F.dropout(doc_vec, p=self.dropout, training=self.training)  # (n_blocks, batch, embed_dim)
-
-        # doc2block level
-        inter_block_vec, _ = self.block_doc_attn(query=block_vec, key=doc_vec, value=doc_vec,
-                                                 graph_mask=doc_block_mask.transpose(1, 2))
-        inter_block_vec = F.dropout(inter_block_vec, p=self.dropout, training=self.training)
-        sentence_fusion2 = self.sentence_fusion2(torch.cat([block_vec, inter_block_vec], 2))
-        block_vec = sentence_fusion2 * block_vec + (1 - sentence_fusion2) * inter_block_vec
 
         x = residual_x + x
         x = self.maybe_layer_norm(self.self_attn_word_layer_norm, x, after=True)
 
         block_vec = residual_block + block_vec
         block_vec = self.maybe_layer_norm(self.self_attn_block_layer_norm, block_vec, after=True)
-
-        doc_vec = residual_doc + doc_vec
-        doc_vec = self.maybe_layer_norm(self.self_attn_doc_layer_norm, doc_vec, after=True)
 
         residual = x
         x = self.maybe_layer_norm(self.final_word_layer_norm, x, before=True)
@@ -688,16 +630,7 @@ class TransformerLayer(nn.Module):
         block_vec = residual + block_vec
         block_vec = self.maybe_layer_norm(self.final_block_layer_norm, block_vec, after=True)
 
-        residual = doc_vec
-        doc_vec = self.maybe_layer_norm(self.final_doc_layer_norm, doc_vec, before=True)
-        doc_vec = self.activation_fn(self.doc_fc1(doc_vec))
-        doc_vec = F.dropout(doc_vec, p=self.activation_dropout, training=self.training)
-        doc_vec = self.doc_fc2(doc_vec)
-        doc_vec = F.dropout(doc_vec, p=self.dropout, training=self.training)
-        doc_vec = residual + doc_vec
-        doc_vec = self.maybe_layer_norm(self.final_doc_layer_norm, doc_vec, after=True)
-
-        return x, block_vec, doc_vec
+        return x, block_vec
 
     def maybe_layer_norm(self, layer_norm, x, before=False, after=False):
         assert before ^ after
@@ -918,72 +851,6 @@ class transformer_with_copy_topkDecoderLayer(nn.Module):
         self.need_attn = need_attn
 
 
-class HierarchicalTransformer_with_docDecoder(nn.Module):
-    def __init__(self, args):
-        super().__init__()
-        self.activation_fn = utils.get_activation_fn(
-            activation=getattr(args, 'activation_fn', 'relu')
-        )
-        self.embed_dim = args.encoder_embed_dim
-        self.dropout = args.dropout
-        self.pooling = MultiheadPooling(
-            args.encoder_embed_dim,
-            args.pooling_attention_heads,
-            dropout=args.dropout
-        )
-        self.doc_attention = MultiheadOnlyAttention(
-            args.encoder_embed_dim, 1,
-            dropout=0,
-        )
-        self.activation_dropout = getattr(args, 'activation_dropout', 0)
-        if self.activation_dropout == 0:
-            # for backwards compatibility with models that use args.relu_dropout
-            self.activation_dropout = getattr(args, 'relu_dropout', 0)
-        self.fc1 = Linear(args.encoder_embed_dim, args.encoder_embed_dim)
-        self.fc2 = Linear(args.encoder_embed_dim, 1)
-        self.sigmoid = nn.Sigmoid()
-        self.cos = nn.CosineSimilarity(dim=2, eps=1e-6)
-
-
-    def forward(self, encoder_out):
-        '''
-        :param encoder_out:  (doc_len, batch_size, embedding_dim)
-        :return:
-        '''
-
-        batch_size = encoder_out['sentence_out'].size(1)
-        doc_vec = self.pooling(encoder_out['sentence_out'], encoder_out['sentence_out'], encoder_out['sentence_padding_mask'])
-        doc_vec = doc_vec.view(batch_size, 1, self.embed_dim)
-        doc_vec = F.dropout(doc_vec, p=self.dropout, training=self.training)
-        # _, attn = self.doc_attention(query=doc_vec,
-        #                              key=encoder_out['doc_out'] if encoder_out is not None else None,
-        #                              value=encoder_out['doc_out'] if encoder_out is not None else None,
-        #                              key_padding_mask=encoder_out[
-        #                                  'doc_padding_mask'] if encoder_out is not None else None,
-        #                              static_kv=True,
-        #                              need_weights=True,
-        #                              )  # attn: (tgt_len, bsz, doc_len)
-        doc_vecs = encoder_out['doc_out'].transpose(0, 1)
-        attn = self.cos(doc_vecs, doc_vec)
-        return attn.squeeze(0)  # (bsz, doc_len)
-
-        # x = self.activation_fn(self.fc1(encoder_out['doc_out']))
-        # x = F.dropout(x, p=self.activation_dropout, training=self.training)
-        # x = self.sigmoid(self.fc2(x)).squeeze(-1)
-        # x = self.sigmoid(self.fc2(encoder_out['doc_out'])).squeeze(-1)
-
-        # x = self.activation_fn(self.fc1(encoder_out['doc_out']))
-        # x = F.dropout(x, p=self.activation_dropout, training=self.training)
-        # x = self.fc2(encoder_out['doc_out']).squeeze(-1)
-
-        # return x.transpose(0, 1)  # (bsz, doc_len)
-
-    def get_normalized_probs(self, net_output, log_probs, sample):
-        """Get normalized probabilities (or log probs) from a net's output."""
-        logits = net_output
-        return logits
-
-
 class HierarchicalTransformer_with_sentenceDecoder(nn.Module):
     def __init__(self, args):
         super().__init__()
@@ -1029,7 +896,7 @@ def Linear(in_features, out_features, bias=True):
     return m
 
 
-@register_model_architecture('hierarchical_transformer_doc_sent_word', 'hierarchical_transformer_doc_sent_word')
+@register_model_architecture('hierarchical_transformer_sent_word', 'hierarchical_transformer_sent_word')
 def base_architecture(args):
     args.encoder_embed_path = getattr(args, 'encoder_embed_path', None)
     args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 512)
@@ -1060,8 +927,8 @@ def base_architecture(args):
     args.decoder_input_dim = getattr(args, 'decoder_input_dim', args.decoder_embed_dim)
 
 
-@register_model_architecture('hierarchical_transformer_doc_sent_word', 'hierarchical_transformer_doc_sent_word_test')
-def hierarchical_transformer_doc_sent_word_iwslt_de_en_test(args):
+@register_model_architecture('hierarchical_transformer_sent_word', 'hierarchical_transformer_sent_word_test')
+def hierarchical_transformer_sent_word_iwslt_de_en_test(args):
     args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 64)
     args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 64)
     args.encoder_attention_heads = getattr(args, 'encoder_attention_heads', 4)
@@ -1074,8 +941,8 @@ def hierarchical_transformer_doc_sent_word_iwslt_de_en_test(args):
     base_architecture(args)
 
 
-@register_model_architecture('hierarchical_transformer_doc_sent_word', 'hierarchical_transformer_doc_sent_word_small')
-def hierarchical_transformer_doc_sent_word_iwslt_de_en_test(args):
+@register_model_architecture('hierarchical_transformer_sent_word', 'hierarchical_transformer_sent_word_small')
+def hierarchical_transformer_sent_word_iwslt_de_en_test(args):
     args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 256)
     args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 512)
     args.encoder_attention_heads = getattr(args, 'encoder_attention_heads', 4)
@@ -1088,8 +955,8 @@ def hierarchical_transformer_doc_sent_word_iwslt_de_en_test(args):
     base_architecture(args)
 
 
-@register_model_architecture('hierarchical_transformer_doc_sent_word', 'hierarchical_transformer_doc_sent_word_medium')
-def hierarchical_transformer_doc_sent_word_iwslt_de_en_test(args):
+@register_model_architecture('hierarchical_transformer_sent_word', 'hierarchical_transformer_sent_word_medium')
+def hierarchical_transformer_sent_word_iwslt_de_en_test(args):
     args.encoder_layers = getattr(args, 'encoder_layers', 6)
     args.encoder_embed_dim = getattr(args, 'encoder_embed_dim', 512)
     args.encoder_ffn_embed_dim = getattr(args, 'encoder_ffn_embed_dim', 2048)
