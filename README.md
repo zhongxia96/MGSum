@@ -25,7 +25,7 @@ python process_hierarchical_sent_doc_copy.py --source-lang src --target-lang tgt
 
 **Train:**
 ```
-CUDA_VISIBLE_DEVICES=7 python train.py multi-news-2000-300-train -a hierarchical_transformer_medium \
+CUDA_VISIBLE_DEVICES=0,1,2,3 python train.py multi-news-2000-300-train -a hierarchical_transformer_medium \
 --optimizer adam --lr 0.0001 -s src -t tgt --dropout 0.1 --max-tokens 2000   \
 --share-decoder-input-output-embed   --task multi_loss_sent_word --adam-betas '(0.9, 0.98)' \
 --save-dir checkpoints/hierarchical_transformer-2000-300 --share-all-embeddings  \
@@ -36,14 +36,14 @@ CUDA_VISIBLE_DEVICES=7 python train.py multi-news-2000-300-train -a hierarchical
 
 **Test-abstractive:**
 ```
-CUDA_VISIBLE_DEVICES=3 python generate_for_hie.py multi-news-2000-300-copy --task multi_loss_sent_word \
+CUDA_VISIBLE_DEVICES=4 python generate_for_hie.py multi-news-2000-300-copy --task multi_loss_sent_word \
 --path checkpoints/hierarchical_transformer-2000-300/checkpoint_best.pt --max-len-b 400 \
 --batch-size 8 --beam 5  --no-repeat-ngram-size 3 --replace-unk --raw-text --lenpen 2  
 ```
 
 **Test-extractive:**
 ```
-CUDA_VISIBLE_DEVICES=2 python generate_for_select.py multi-news-2000-300-copy --task sent_extract \
+CUDA_VISIBLE_DEVICES=4 python generate_for_select.py multi-news-2000-300-copy --task sent_extract \
 --path checkpoints/hierarchical_transformer-2000-300/checkpoint_best.pt --batch-size 1 --replace-unk \
 --raw-text
 ```
