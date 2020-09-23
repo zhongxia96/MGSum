@@ -1,4 +1,4 @@
-# MGSum: Multi-Granularity Interaction Network for Extractive and Abstractive Multi-Document Summarization
+# MGSum
 **Code for ACL'20 paper [Multi-Granularity Interaction Network for Extractive and Abstractive Multi-Document Summarization](https://www.aclweb.org/anthology/2020.acl-main.556/) by Hanqi Jin, Tianming Wang, Xiaojun Wan. This paper is accepted by ACL'20.**
 
 Some codes are borrowed from [fairseq](https://github.com/pytorch/fairseq).
@@ -48,4 +48,23 @@ CUDA_VISIBLE_DEVICES=4 python generate_for_select.py multi-news-2000-300-copy --
 --raw-text
 ```
 
+**Citation:**
+```
+@inproceedings{DBLP:conf/acl/JinWW20,
+  author    = {Hanqi Jin and
+               Tianming Wang and
+               Xiaojun Wan},
+  title     = {Multi-Granularity Interaction Network for Extractive and Abstractive
+               Multi-Document Summarization},
+  booktitle = {Proceedings of the 58th Annual Meeting of the Association for Computational
+               Linguistics, {ACL} 2020, Online, July 5-10, 2020},
+  pages     = {6244--6254},
+  year      = {2020},
+  crossref  = {DBLP:conf/acl/2020},
+  url       = {https://www.aclweb.org/anthology/2020.acl-main.556/},
+  timestamp = {Wed, 24 Jun 2020 17:15:07 +0200},
+  biburl    = {https://dblp.org/rec/conf/acl/JinWW20.bib},
+  bibsource = {dblp computer science bibliography, https://dblp.org}
+}
+```
 
