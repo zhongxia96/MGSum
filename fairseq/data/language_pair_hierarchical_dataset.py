@@ -36,7 +36,7 @@ def collate(
 
     id = torch.LongTensor([s['id'] for s in samples])
     src_tokens = merge('source', left_pad=left_pad_source)
-
+    # src_tokens_for_infer = merge('source', left_pad_source=left_pad_source, infer=True)
     # sort by descending source sentence count
     src_lengths = torch.LongTensor([len(s['source']) for s in samples])
     src_lengths, sort_order = src_lengths.sort(descending=True)
